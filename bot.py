@@ -1,4 +1,5 @@
 import os
+import re
 import requests
 import pandas as pd
 import glob
@@ -35,12 +36,20 @@ def save_offset(offset):
     except Exception as e:
         print(f"خطأ حفظ offset: {e}")
 
+def _report_sort_key(path):
+    m = re.search(r"tasi_report_(\d{4}-\d{2}-\d{2})_(\d{1,2})(am|pm)\.csv$", os.path.basename(path))
+    if not m:
+        return "0000-00-00_00"
+    date, h, ap = m.groups()
+    hour = int(h) % 12 + (12 if ap == "pm" else 0)
+    return f"{date}_{hour:02d}"
+
 def get_latest_data():
     try:
         files = glob.glob(os.path.join(REPORTS_DIR, "tasi_report_*.csv"))
         if not files:
             return None
-        latest = max(files)
+        latest = max(files, key=_report_sort_key)
         df = pd.read_csv(latest, encoding="utf-8-sig")
         return df
     except:

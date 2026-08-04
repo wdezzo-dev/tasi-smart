@@ -156,6 +156,8 @@ def build_report(universe_df):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     today_str = datetime.now().strftime("%Y-%m-%d")
+    hour_24 = datetime.now().hour
+    hour_label = f"{hour_24 % 12 or 12}{'pm' if hour_24 >= 12 else 'am'}"
     is_last_run = datetime.utcnow().hour == 13  # تنبيهات تيليجرام مرة واحدة يومياً (آخر تشغيل 13:00 UTC)
 
     # ══════════════════════════════
@@ -174,7 +176,7 @@ def main():
         if is_last_run:
             top_sa = report_df.head(TOP_N).to_dict("records")
             notify.send_daily_alerts(top_sa, today_str)
-        csv_path = os.path.join(OUTPUT_DIR, f"tasi_report_{today_str}.csv")
+        csv_path = os.path.join(OUTPUT_DIR, f"tasi_report_{today_str}_{hour_label}.csv")
         report_df.to_csv(csv_path, encoding="utf-8-sig")
         print(f"تم حفظ CSV: {csv_path}")
     else:
