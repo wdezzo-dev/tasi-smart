@@ -35,7 +35,7 @@ import pandas as pd
 import indicators as ind
 
 
-MIN_ROWS = 60  # أقل عدد جلسات مطلوب لحساب موثوق
+MIN_ROWS = 200  # أقل عدد جلسات مطلوب لحساب موثوق
 
 
 def _clip(x, lo, hi):

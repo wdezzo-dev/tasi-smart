@@ -1,0 +1,43 @@
+name: daily-1h
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 8-13 * * 0-4'
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - name: Compute cache date
+        run: echo "CACHE_DATE=$(date -u +%F)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: hourly
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Restore OHLCV cache
+        uses: actions/cache@v4
+        with:
+          path: data/prices_1h
+          key: ohlcv-1h-${{ env.CACHE_DATE }}
+          restore-keys: |
+            ohlcv-1h-
+      - run: pip install -r requirements.txt
+      - run: python tasi_smart_score.py
+      - name: Save OHLCV cache
+        uses: actions/cache@v4
+        with:
+          path: data/prices_1h
+          key: ohlcv-1h-${{ env.CACHE_DATE }}
+      - name: Commit data
+        run: |
+          git config user.name "bot"
+          git config user.email "bot@bot.com"
+          git add data/ reports/ || true
+          git diff --quiet --cached || git commit -m "update 1h"
+          git push origin HEAD:hourly || true

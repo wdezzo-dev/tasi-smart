@@ -55,7 +55,7 @@ def render_header(dates):
     c1, c2 = st.columns([3, 1])
     with c1:
         st.title("📊 تاسي الذكي - تقييم احتمالية بدء موجة صعود")
-        st.caption("تحليل فني وكمي يومي لكل أسهم السوق الرئيسية (تاسي) - تجميع، سيولة ذكية، اختراقات، وتشبع بيع")
+        st.caption("تحليل فني وكمي على بيانات كل ساعة (1h) لكل أسهم السوق الرئيسية (تاسي) - تجميع، سيولة ذكية، اختراقات، وتشبع بيع")
     with c2:
         if dates:
             st.metric("آخر تحديث", dates[0])
@@ -120,7 +120,7 @@ def main():
         "code", "name", "sector", "price", "price_chg_20d_pct", "score", "classification"
     ]].rename(columns={
         "code": "الرمز", "name": "الاسم", "sector": "القطاع", "price": "السعر",
-        "price_chg_20d_pct": "تغير 20 يوم %", "score": "الدرجة", "classification": "التصنيف",
+        "price_chg_20d_pct": "تغير 20 ساعة %", "score": "الدرجة", "classification": "التصنيف",
     })
 
     st.dataframe(
@@ -131,11 +131,11 @@ def main():
             "الدرجة": st.column_config.ProgressColumn(
                 "الدرجة", min_value=0, max_value=100, format="%.0f"
             ),
-            "تغير 20 يوم %": st.column_config.NumberColumn(format="%.1f%%"),
+            "تغير 20 ساعة %": st.column_config.NumberColumn(format="%.1f%%"),
         },
     )
 
-    st.markdown("### 🧠 أسباب الاختيار (تفصيلي)")
+    st.markdown("### 🧠 أسباب الاختيار (مبنية على بيانات كل ساعة 1h)")
     for _, row in filtered.iterrows():
         color = CLASS_COLORS.get(row["classification"], "#888")
         with st.expander(f"{row['code']} - {row['name']}  |  الدرجة: {row['score']:.0f}  |  {row['classification']}"):
@@ -143,7 +143,7 @@ def main():
                 f"<span style='color:{color}; font-weight:bold'>{row['classification']}</span>",
                 unsafe_allow_html=True,
             )
-            st.write(f"**القطاع:** {row['sector']}  |  **السعر:** {row['price']}  |  **RSI(14):** {row['rsi14']}")
+            st.write(f"**القطاع:** {row['sector']}  |  **السعر:** {row['price']}  |  **RSI(14 ساعة):** {row['rsi14']}")
             st.write("**الإشارات المرصودة:**")
             reasons = (row["reasons"] or "").split(" | ")
             for r in reasons:
@@ -167,7 +167,8 @@ def main():
     st.markdown("---")
     st.caption(
         "⚠️ هذا تحليل فني وكمي إحصائي وليس توصية استثمارية أو ضمانة لأي تحرك سعري. "
-        "البيانات من Yahoo Finance وتُحدَّث تلقائياً يومياً بعد إغلاق السوق."
+        "بيانات السوق السعودي (تاسي) من Yahoo Finance على أساس كل ساعة (1h) لمدة 6 أشهر، "
+        "وتُحدَّث تلقائياً يومياً بعد إغلاق السوق."
     )
 
 

@@ -15,6 +15,7 @@ import pandas as pd
 import scoring
 import db
 import notify
+import ohlcv_cache
 
 warnings.filterwarnings("ignore")
 
@@ -26,10 +27,11 @@ except ImportError:
 
 TICKERS_FILE      = os.path.join(os.path.dirname(__file__), "tickers_tasi.csv")
 OUTPUT_DIR        = os.path.join(os.path.dirname(__file__), "reports")
-HISTORY_PERIOD    = "1y"
-BATCH_SIZE        = 25
+HISTORY_PERIOD    = "6mo"
+INTERVAL          = "1h"
+BATCH_SIZE        = 10
 TOP_N             = 20
-REQUEST_PAUSE_SEC = 1.0
+REQUEST_PAUSE_SEC = 2.0
 
 
 def load_universe(path=TICKERS_FILE):
@@ -38,11 +40,13 @@ def load_universe(path=TICKERS_FILE):
     return df
 
 
-def fetch_batch(symbols, period=HISTORY_PERIOD):
+def _download(symbols, period):
+    if not symbols:
+        return {}
     data = yf.download(
         tickers=" ".join(symbols),
         period=period,
-        interval="1d",
+        interval=INTERVAL,
         group_by="ticker",
         auto_adjust=False,
         threads=True,
@@ -61,6 +65,33 @@ def fetch_batch(symbols, period=HISTORY_PERIOD):
                 result[sym] = sub
         except Exception:
             continue
+    return result
+
+
+def fetch_batch(symbols, seed_period=HISTORY_PERIOD, delta_period=ohlcv_cache.DELTA_PERIOD):
+    """يجلب بذرة كاملة للسهم بدون ذاكرة، وزيادة (delta) للسهم المخزّن، ثم يدمج ويحفظ"""
+    existing = {s: ohlcv_cache.load(s) for s in symbols}
+    to_seed = [s for s in symbols
+               if existing[s] is None or len(existing[s]) < ohlcv_cache.MIN_ROWS_FOR_DELTA]
+    to_delta = [s for s in symbols if s not in to_seed]
+
+    result = {}
+    if to_seed:
+        result.update(_download(to_seed, seed_period))
+    if to_delta:
+        result.update(_download(to_delta, delta_period))
+
+    for sym in symbols:
+        df = result.get(sym)
+        if df is None or df.empty:
+            continue
+        merged = ohlcv_cache.merge(existing[sym], df)
+        merged = ohlcv_cache.prune(merged)
+        if merged is None or merged.empty:
+            result.pop(sym, None)
+            continue
+        ohlcv_cache.save(sym, merged)
+        result[sym] = merged
     return result
 
 
@@ -98,7 +129,7 @@ def build_report(universe_df):
                 "الاسم":             meta["name"],
                 "القطاع":            meta["sector"],
                 "السعر":             result["close"],
-                "التغير_20يوم_%":    result["price_chg_20d_pct"],
+                "التغير_20ساعة_%":    result["price_chg_20d_pct"],
                 "RSI14":             result["rsi14"],
                 "الدرجة":            result["total"],
                 "التصنيف":           result["classification"],
@@ -108,7 +139,7 @@ def build_report(universe_df):
                 "اختراق_فني":        result["sub_scores"]["اختراق_فني"],
                 "بنية_الاتجاه":     result["sub_scores"]["بنية_الاتجاه"],
                 "عقوبة_تصريف":      result["penalty"],
-                "أسباب_الاختيار":   " | ".join(result["signals"]) if result["signals"] else "لا توجد إشارات",
+                "أسباب_الاختيار (بناءً على 1h)":   " | ".join(result["signals"]) if result["signals"] else "لا توجد إشارات",
             })
         time.sleep(REQUEST_PAUSE_SEC)
 
@@ -125,6 +156,7 @@ def build_report(universe_df):
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     today_str = datetime.now().strftime("%Y-%m-%d")
+    is_last_run = datetime.utcnow().hour == 13  # تنبيهات تيليجرام مرة واحدة يومياً (آخر تشغيل 13:00 UTC)
 
     # ══════════════════════════════
     # 1) السوق السعودي (تاسي)
@@ -139,8 +171,9 @@ def main():
     if not report_df.empty:
         n_saved = db.save_report(report_df, today_str)
         print(f"تم حفظ {n_saved} سهم في قاعدة البيانات.")
-        top_sa = report_df.head(TOP_N).to_dict("records")
-        notify.send_daily_alerts(top_sa, today_str)
+        if is_last_run:
+            top_sa = report_df.head(TOP_N).to_dict("records")
+            notify.send_daily_alerts(top_sa, today_str)
         csv_path = os.path.join(OUTPUT_DIR, f"tasi_report_{today_str}.csv")
         report_df.to_csv(csv_path, encoding="utf-8-sig")
         print(f"تم حفظ CSV: {csv_path}")
@@ -148,16 +181,17 @@ def main():
         print("لم تُنتج نتائج للسوق السعودي.")
 
     # ══════════════════════════════
-    # 2) السوق الأمريكي
+    # 2) السوق الأمريكي (مرة واحدة يومياً في آخر تشغيل)
     # ══════════════════════════════
-    print("\n" + "=" * 50)
-    print("🇺🇸 بدء تحليل السوق الأمريكي...")
-    print("=" * 50)
-    try:
-        import us_smart_score
-        us_smart_score.run_us_analysis(today_str)
-    except Exception as e:
-        print(f"⚠️ خطأ في تحليل السوق الأمريكي: {e}")
+    if is_last_run:
+        print("\n" + "=" * 50)
+        print("🇺🇸 بدء تحليل السوق الأمريكي...")
+        print("=" * 50)
+        try:
+            import us_smart_score
+            us_smart_score.run_us_analysis(today_str)
+        except Exception as e:
+            print(f"⚠️ خطأ في تحليل السوق الأمريكي: {e}")
 
     print("\n✅ اكتمل التحليل اليومي.")
 
