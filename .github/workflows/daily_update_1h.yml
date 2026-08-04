@@ -2,7 +2,7 @@ name: daily-1h
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: '0 8-13 * * 0-4'
+    - cron: '25 8-13 * * 0-4'
 permissions:
   contents: write
 jobs:
