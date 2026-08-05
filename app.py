@@ -117,7 +117,7 @@ def main():
 
     st.markdown("### 🏆 الترتيب اليومي")
     display_df = filtered[[
-        "classification"
+        "classification",
         "score",
         "price_chg_20d_pct",
         "price",
