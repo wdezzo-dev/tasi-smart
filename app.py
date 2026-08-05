@@ -117,10 +117,21 @@ def main():
 
     st.markdown("### 🏆 الترتيب اليومي")
     display_df = filtered[[
-        "code", "name", "sector", "price", "price_chg_20d_pct", "score", "classification"
+        "classification"
+        "score",
+        "price_chg_20d_pct",
+        "price",
+        "sector",
+        "name",
+        "code",
     ]].rename(columns={
-        "code": "الرمز", "name": "الاسم", "sector": "القطاع", "price": "السعر",
-        "price_chg_20d_pct": "تغير 20 يوم %", "score": "الدرجة", "classification": "التصنيف",
+        "classification": "التصنيف",
+        "score": "الدرجة",
+        "price_chg_20d_pct": "تغير 20 يوم %",
+        "price": "السعر",
+        "sector": "القطاع",
+        "name": "الاسم",
+        "code": "الرمز",
     })
 
     st.dataframe(
